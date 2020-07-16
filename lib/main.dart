@@ -1,9 +1,16 @@
 import 'package:apple_sign_in/apple_sign_in.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
-  runApp(MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  final appleSignInAvailable = await AppleSignInAvailable.check();
+  runApp(Provider<AppleSignInAvailable>.value(
+    value: appleSignInAvailable,
+    child: MyApp(),
+  ));
 }
 
 class MyApp extends StatefulWidget {
@@ -20,51 +27,58 @@ class AppleSignInAvailable {
   }
 }
 
+class AuthService {
+  final _firebaseAuth = FirebaseAuth.instance;
+
+  Future<FirebaseUser> signInWithApple({List<Scope> scopes = const []}) async {
+    // 1. perform the sign-in request
+    final result = await AppleSignIn.performRequests(
+        [AppleIdRequest(requestedScopes: scopes)]);
+    // 2. check the result
+    switch (result.status) {
+      case AuthorizationStatus.authorized:
+        final appleIdCredential = result.credential;
+        final oAuthProvider = OAuthProvider(providerId: 'apple.com');
+        final credential = oAuthProvider.getCredential(
+          idToken: String.fromCharCodes(appleIdCredential.identityToken),
+          accessToken:
+              String.fromCharCodes(appleIdCredential.authorizationCode),
+        );
+        final authResult = await _firebaseAuth.signInWithCredential(credential);
+        final firebaseUser = authResult.user;
+        if (scopes.contains(Scope.fullName)) {
+          final updateUser = UserUpdateInfo();
+          updateUser.displayName =
+              '${appleIdCredential.fullName.givenName} ${appleIdCredential.fullName.familyName}';
+          await firebaseUser.updateProfile(updateUser);
+        }
+        return firebaseUser;
+      case AuthorizationStatus.error:
+        print(result.error.toString());
+        throw PlatformException(
+          code: 'ERROR_AUTHORIZATION_DENIED',
+          message: result.error.toString(),
+        );
+
+      case AuthorizationStatus.cancelled:
+        throw PlatformException(
+          code: 'ERROR_ABORTED_BY_USER',
+          message: 'Sign in aborted by user',
+        );
+    }
+    return null;
+  }
+}
+
 class _MyAppState extends State<MyApp> {
-  Future<void> initiateSignInWithApple() async {
+  Future<void> _signInWithApple(BuildContext context) async {
     try {
-      final AuthorizationResult result = await AppleSignIn.performRequests([
-        AppleIdRequest(requestedScopes: [Scope.email, Scope.fullName])
-      ]);
-
-      switch (result.status) {
-        case AuthorizationStatus.authorized:
-          try {
-            print("successfull sign in");
-            final AppleIdCredential appleIdCredential = result.credential;
-
-            OAuthProvider oAuthProvider =
-                new OAuthProvider(providerId: "apple.com");
-            final AuthCredential credential = oAuthProvider.getCredential(
-              idToken: String.fromCharCodes(appleIdCredential.identityToken),
-              accessToken:
-                  String.fromCharCodes(appleIdCredential.authorizationCode),
-            );
-
-            final AuthResult _res =
-                await FirebaseAuth.instance.signInWithCredential(credential);
-
-            FirebaseAuth.instance.currentUser().then((val) async {
-              UserUpdateInfo updateUser = UserUpdateInfo();
-              updateUser.displayName =
-                  "${appleIdCredential.fullName.givenName} ${appleIdCredential.fullName.familyName}";
-              updateUser.photoUrl = "define an url";
-              await val.updateProfile(updateUser);
-            });
-          } catch (e) {
-            print("error");
-          }
-          break;
-        case AuthorizationStatus.error:
-          // do something
-          break;
-
-        case AuthorizationStatus.cancelled:
-          print('User cancelled');
-          break;
-      }
-    } catch (error) {
-      print("error with apple sign in");
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final user = await authService
+          .signInWithApple(scopes: [Scope.email, Scope.fullName]);
+      print('uid: ${user.uid}');
+    } catch (e) {
+      print(e);
     }
   }
 
@@ -75,6 +89,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final appleSignInAvailable =
+        Provider.of<AppleSignInAvailable>(context, listen: false);
     return MaterialApp(
         home: Scaffold(
             backgroundColor: Colors.grey,
@@ -88,13 +104,12 @@ class _MyAppState extends State<MyApp> {
                   'Login With',
                   style: TextStyle(fontSize: 25, color: Colors.white),
                 ),
-                AppleSignInButton(
-                  style: ButtonStyle.black,
-                  type: ButtonType.signIn,
-                  onPressed: () {
-                    initiateSignInWithApple();
-                  },
-                )
+                if (appleSignInAvailable.isAvailable)
+                  AppleSignInButton(
+                    style: ButtonStyle.black,
+                    type: ButtonType.signIn,
+                    onPressed: () {},
+                  )
               ],
             )));
   }

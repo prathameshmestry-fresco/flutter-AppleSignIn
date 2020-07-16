@@ -34,28 +34,28 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     final appleSignInAvailable =
         Provider.of<AppleSignInAvailable>(context, listen: false);
-    return MaterialApp(
-        home: Scaffold(
-            backgroundColor: Colors.grey,
-            appBar: AppBar(
-              title: const Text('Flutter'),
-            ),
-            body: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  'Login With',
-                  style: TextStyle(fontSize: 25, color: Colors.white),
+    return Provider<AuthService>(
+        create: (_) => AuthService(),
+        child: MaterialApp(
+            home: Scaffold(
+                backgroundColor: Colors.grey,
+                appBar: AppBar(
+                  title: const Text('Flutter'),
                 ),
-                if (appleSignInAvailable.isAvailable)
-                  AppleSignInButton(
-                    style: ButtonStyle.black,
-                    type: ButtonType.signIn,
-                    onPressed: () {
-                      _signInWithApple(context);
-                    },
-                  )
-              ],
-            )));
+                body: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Text(
+                      'Login With',
+                      style: TextStyle(fontSize: 25, color: Colors.white),
+                    ),
+                    if (appleSignInAvailable.isAvailable)
+                      AppleSignInButton(
+                        style: ButtonStyle.black,
+                        type: ButtonType.signIn,
+                        onPressed: () => _signInWithApple(context),
+                      )
+                  ],
+                ))));
   }
 }

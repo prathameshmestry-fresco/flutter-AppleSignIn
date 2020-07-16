@@ -1,10 +1,11 @@
 import 'package:appleSignIn_Demo/apple_signin_available.dart';
 import 'package:appleSignIn_Demo/auth_service.dart';
-import 'package:apple_sign_in/apple_sign_in.dart';
+import 'package:appleSignIn_Demo/sign_in_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
+  // Fix for: Unhandled Exception: ServicesBinding.defaultBinaryMessenger was accessed before the binding was initialized.
   WidgetsFlutterBinding.ensureInitialized();
   final appleSignInAvailable = await AppleSignInAvailable.check();
   runApp(Provider<AppleSignInAvailable>.value(
@@ -13,49 +14,19 @@ void main() async {
   ));
 }
 
-class MyApp extends StatefulWidget {
-  @override
-  _MyAppState createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  Future<void> _signInWithApple(BuildContext context) async {
-    try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final user = await authService
-          .signInWithApple(scopes: [Scope.email, Scope.fullName]);
-      print('uid: ${user.uid}');
-    } catch (e) {
-      print(e);
-    }
-  }
-
+class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final appleSignInAvailable =
-        Provider.of<AppleSignInAvailable>(context, listen: false);
     return Provider<AuthService>(
-        create: (_) => AuthService(),
-        child: MaterialApp(
-            home: Scaffold(
-                backgroundColor: Colors.grey,
-                appBar: AppBar(
-                  title: const Text('Flutter'),
-                ),
-                body: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      'Login With',
-                      style: TextStyle(fontSize: 25, color: Colors.white),
-                    ),
-                    if (appleSignInAvailable.isAvailable)
-                      AppleSignInButton(
-                        style: ButtonStyle.black,
-                        type: ButtonType.signIn,
-                        onPressed: () => _signInWithApple(context),
-                      )
-                  ],
-                ))));
+      create: (_) => AuthService(),
+      child: MaterialApp(
+        title: 'Apple Sign In with Firebase',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.indigo,
+        ),
+        home: SignInPage(),
+      ),
+    );
   }
 }
